@@ -17,6 +17,9 @@ These contracts are mandatory. They are not suggestions.
 - send the plan request to Planner
 - validate or reject the slice plan
 - send the approved implementation request to Worker
+- use tightly structured prompts for Planner and Worker
+- include explicit anti-drift instructions in both handoffs
+- show the exact dispatch prompt to the user before sending it when the user asked for prompt visibility
 - poll Planner every 2 minutes
 - poll Worker every 1 minute
 - review the PR with `advanced-code-reviewer`
@@ -27,6 +30,7 @@ These contracts are mandatory. They are not suggestions.
 ### Forbidden Actions
 
 - do not edit product code directly
+- do not send loose, underspecified prompts to Planner or Worker
 - do not widen scope without a new plan
 - do not merge a PR with unresolved `P0` or `P1` findings
 - do not accept vague verification claims
@@ -135,19 +139,27 @@ Must include:
 
 - slice ID and title
 - goal
+- in-scope work
+- out-of-scope work
 - success criteria
 - restrictions
 - current repo state if relevant
+- explicit anti-drift notes
+- required output structure
 
 ### Controller -> Worker
 
 Must include:
 
 - approved slice plan
+- goal
+- approved scope
 - exact restrictions
 - branch naming rule
 - required verification
 - PR body rule
+- explicit anti-drift notes
+- explicit reminder that future-slice work is forbidden
 
 ### Controller -> Worker After Review
 

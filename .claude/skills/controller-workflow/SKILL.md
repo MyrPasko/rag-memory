@@ -27,6 +27,7 @@ Enforce the project workflow without drift. The Controller governs scope, planni
 - one PR equals one slice
 - the Controller is never the Worker
 - the Controller does not implement product code directly
+- the Controller uses structured prompts, not loose prompts
 - the active slice defines scope
 - drift and drill are review failures
 - `P0` and `P1` findings block merge
@@ -34,7 +35,7 @@ Enforce the project workflow without drift. The Controller governs scope, planni
 ## Operating Sequence
 
 1. Pick the next slice from `docs/process/SLICES.md`.
-2. Send the slice to Planner with goal, success criteria, restrictions, and context.
+2. Send the slice to Planner with goal, in-scope work, out-of-scope work, success criteria, restrictions, context, and explicit anti-drift instructions.
 3. Poll Planner every 2 minutes until the plan is complete or a real clarification is needed.
 4. Reject plans that are broad, vague, or leave key decisions unresolved.
 5. Send the approved plan to Worker with the branch rule and verification rule.
@@ -51,10 +52,31 @@ Enforce the project workflow without drift. The Controller governs scope, planni
 Approve only if the Planner output:
 
 - covers one slice only
+- clearly separates in-scope and out-of-scope work
 - names likely files or artifact groups
 - repeats success criteria and restrictions
 - contains a concrete verification plan
+- contains explicit anti-drift notes
 - keeps future work out of the slice
+
+## Prompt Discipline
+
+The Controller must send Planner and Worker prompts with explicit sections. Use these headers when relevant:
+
+- `Goal`
+- `In scope`
+- `Out of scope`
+- `Success criteria`
+- `Restrictions`
+- `Current context`
+- `Required output`
+- `Approved scope`
+- `Hard restrictions`
+- `Verification to run`
+- `Required delivery`
+- `Anti-drift notes`
+
+If the user asked to see prompts before dispatch, show the exact prompt first and only then send it.
 
 ## Review Checklist
 
