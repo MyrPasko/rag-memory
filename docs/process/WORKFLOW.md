@@ -7,6 +7,7 @@ This document is the authoritative implementation workflow for this repository.
 - Build the project only through narrow, mergeable slices.
 - One PR equals one slice. No exceptions.
 - The Controller does not implement product code directly.
+- The Controller must use tightly structured prompts for Planner and Worker. Do not send loose prompts.
 - The Planner plans one slice at a time.
 - The Worker implements one approved slice at a time on a fresh feature branch.
 - The Controller does not tolerate drift, drill, opportunistic cleanup, or “while I was here” edits.
@@ -128,8 +129,11 @@ Pattern: `feature/sXX-short-slice-name`
 ### 2. Controller requests the plan from Planner
 
 - Send one slice only.
-- Include the slice ID, title, goal, success criteria, restrictions, known files, and open constraints.
+- Include the slice ID, title, goal, in-scope work, out-of-scope work, success criteria, restrictions, known files, and open constraints.
 - Require a concrete implementation plan, not a brainstorming memo.
+- Use a structured prompt with explicit sections. At minimum: `Goal`, `In scope`, `Out of scope`, `Success criteria`, `Restrictions`, `Current context`, and `Required output`.
+- Add explicit anti-drift instructions to the prompt.
+- If the user asked to see prompts before dispatch, show the exact prompt first and only then send it.
 - Run Planner with `claude --model claude-opus-4-6 --permission-mode plan --agent planner ...`
 
 ### 3. Controller polls Planner every 2 minutes
@@ -143,15 +147,20 @@ Pattern: `feature/sXX-short-slice-name`
 A plan is acceptable only if it:
 
 - stays inside one slice
+- clearly separates in-scope and out-of-scope work
 - lists intended files or artifact groups
 - includes verification steps
 - repeats success criteria and restrictions
+- contains explicit anti-drift notes
 - does not hide future work inside this slice
 
 ### 5. Controller requests implementation from Worker
 
 - Send the approved plan as the Worker contract.
+- Use a structured prompt with explicit sections. At minimum: `Goal`, `Approved scope`, `Hard restrictions`, `Required branch`, `Verification to run`, and `Required delivery`.
 - Explicitly forbid drift.
+- Explicitly forbid “while I was here” cleanup, speculative abstractions, and future-slice work.
+- If the user asked to see prompts before dispatch, show the exact prompt first and only then send it.
 - Require the Worker to create a fresh feature branch before editing.
 - Run Worker with `claude --model claude-sonnet-4-6 --agent worker ...`
 
