@@ -122,6 +122,27 @@ async function buildKindRecords(
   );
 }
 
+function buildRecordMap(
+  records: IndexedArtifactRecord[],
+): Map<string, IndexedArtifactRecord> {
+  const byId = new Map<string, IndexedArtifactRecord>();
+
+  for (const record of records) {
+    const normalizedId = normalizeText(record.summary.id);
+    const existing = byId.get(normalizedId);
+
+    if (existing) {
+      throw new IndexBuildError(
+        `Duplicate artifact id "${record.summary.id}" found in ${existing.summary.relative_path} and ${record.summary.relative_path}`,
+      );
+    }
+
+    byId.set(normalizedId, record);
+  }
+
+  return byId;
+}
+
 export async function buildDerivedIndex(rootDir: string): Promise<DerivedIndex> {
   const recordGroups = await Promise.all(
     ARTIFACT_KINDS.map((kind) => buildKindRecords(rootDir, kind)),
@@ -129,9 +150,7 @@ export async function buildDerivedIndex(rootDir: string): Promise<DerivedIndex> 
   const records = recordGroups
     .flat()
     .sort((left, right) => left.summary.id.localeCompare(right.summary.id));
-  const byId = new Map(
-    records.map((record) => [normalizeText(record.summary.id), record] as const),
-  );
+  const byId = buildRecordMap(records);
 
   return {
     rootDir,

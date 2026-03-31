@@ -91,4 +91,45 @@ describe('buildDerivedIndex', () => {
       IndexBuildError,
     );
   });
+
+  it('fails deterministically when normalized artifact ids collide', async () => {
+    const fixture = createTempMemoryRoot([
+      {
+        path: 'knowledge/patterns/pat-duplicate.md',
+        frontmatter: {
+          id: 'dup-001',
+          type: 'pattern',
+          title: 'Duplicate id pattern',
+          status: 'canonical',
+          scope: 'global',
+          tags: ['duplicate'],
+          summary: 'First artifact using a shared identifier.',
+          created_at: '2026-03-30T09:00:00Z',
+          updated_at: '2026-03-30T09:15:00Z',
+        },
+        body: 'A canonical pattern with a duplicate identifier.',
+      },
+      {
+        path: 'state/sessions/session-duplicate.md',
+        frontmatter: {
+          id: ' DUP-001 ',
+          type: 'session',
+          title: 'Duplicate id session',
+          status: 'validated',
+          scope: 'ticket',
+          session_id: 'sess-duplicate',
+          tags: ['duplicate'],
+          summary: 'Second artifact using the same id after normalization.',
+          created_at: '2026-03-30T10:00:00Z',
+          updated_at: '2026-03-30T10:15:00Z',
+        },
+        body: 'A session artifact that collides after trimming and lower-casing.',
+      },
+    ]);
+    cleanups.push(fixture.cleanup);
+
+    await expect(buildDerivedIndex(fixture.rootDir)).rejects.toThrow(
+      /Duplicate artifact id "DUP-001"/i,
+    );
+  });
 });
