@@ -88,6 +88,30 @@ describe('parseArtifact – valid fixtures', () => {
       expect(typeof artifact.body).toBe('string');
     }
   });
+
+  it('normalizes tags to lowercase unique values', () => {
+    const raw = `---
+id: pat-tag-normalization
+type: pattern
+title: Tag Normalization
+status: canonical
+scope: global
+tags:
+  - API
+  - api
+  - GraphQL
+  - graphql
+summary: Ensures tag normalization is canonical.
+created_at: "2024-06-01T00:00:00.000Z"
+updated_at: "2024-06-01T00:00:00.000Z"
+---
+
+Tag normalization fixture body.
+`;
+
+    const artifact = parseArtifact(raw);
+    expect(artifact.tags).toEqual(['api', 'graphql']);
+  });
 });
 
 describe('parseArtifact – invalid fixtures', () => {

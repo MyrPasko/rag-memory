@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
-    "test": "vitest run"
+    "test": "vitest run tests"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

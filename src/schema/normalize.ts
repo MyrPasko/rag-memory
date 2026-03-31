@@ -26,6 +26,16 @@ function normalizeStringArray(val: unknown): string[] {
   return [];
 }
 
+function normalizeTagArray(val: unknown): string[] {
+  return Array.from(
+    new Set(
+      normalizeStringArray(val)
+        .map((tag) => tag.toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
 export function normalizeRaw(
   data: RawArtifactData,
   body: string,
@@ -36,7 +46,7 @@ export function normalizeRaw(
     title: normalizeString(data['title']),
     status: normalizeStringLower(data['status']),
     scope: normalizeStringLower(data['scope']),
-    tags: normalizeStringArray(data['tags']),
+    tags: normalizeTagArray(data['tags']),
     summary: normalizeString(data['summary']),
     created_at: normalizeString(data['created_at']),
     updated_at: normalizeString(data['updated_at']),
