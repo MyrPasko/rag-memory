@@ -1,0 +1,96 @@
+{
+  "name": "retrieval-regression",
+  "artifacts": [
+    {
+      "path": "knowledge/patterns/pat-canonical-cache.md",
+      "frontmatter": {
+        "id": "pat-canonical-cache",
+        "type": "pattern",
+        "title": "Canonical cache invalidation",
+        "status": "canonical",
+        "scope": "global",
+        "tags": ["cache"],
+        "summary": "Canonical guidance for cache invalidation.",
+        "created_at": "2026-03-31T08:00:00Z",
+        "updated_at": "2026-03-31T08:00:00Z",
+        "sources": [],
+        "supersedes": []
+      },
+      "body": "Use deterministic invalidation points for cached data."
+    },
+    {
+      "path": "knowledge/conventions/conv-logging.md",
+      "frontmatter": {
+        "id": "conv-logging",
+        "type": "convention",
+        "title": "Structured logging convention",
+        "status": "canonical",
+        "scope": "repo",
+        "repo": "rag-memory",
+        "tags": ["logging"],
+        "summary": "Use structured JSON logs for CLI and MCP flows.",
+        "created_at": "2026-03-31T08:10:00Z",
+        "updated_at": "2026-03-31T08:10:00Z",
+        "sources": [],
+        "supersedes": []
+      },
+      "body": "Structured logging keeps the retrieval pipeline observable."
+    },
+    {
+      "path": "state/sessions/session-cache.md",
+      "frontmatter": {
+        "id": "session-cache",
+        "type": "session",
+        "title": "Session notes on cache invalidation",
+        "status": "validated",
+        "scope": "repo",
+        "repo": "rag-memory",
+        "session_id": "sess-cache",
+        "tags": ["cache"],
+        "summary": "Historical notes about cache invalidation.",
+        "created_at": "2026-03-31T09:00:00Z",
+        "updated_at": "2026-03-31T09:00:00Z",
+        "sources": [],
+        "supersedes": []
+      },
+      "body": "Historical notes that should stay out of canonical retrieval."
+    }
+  ],
+  "cases": [
+    {
+      "name": "repo conventions stay repo scoped",
+      "tool": "get_repo_conventions",
+      "args": {
+        "repo": "rag-memory",
+        "text": "logging",
+        "limit": 5
+      },
+      "expected_ids": ["conv-logging"]
+    },
+    {
+      "name": "canonical pattern stays canonical",
+      "tool": "find_canonical_pattern",
+      "args": {
+        "text": "cache invalidation"
+      },
+      "expected_id": "pat-canonical-cache"
+    },
+    {
+      "name": "related sessions stay isolated from canonical knowledge",
+      "tool": "find_related_sessions",
+      "args": {
+        "text": "cache invalidation",
+        "limit": 5
+      },
+      "expected_ids": ["session-cache"]
+    },
+    {
+      "name": "artifact summaries resolve by exact id",
+      "tool": "fetch_artifact_summary",
+      "args": {
+        "id": "session-cache"
+      },
+      "expected_id": "session-cache"
+    }
+  ]
+}

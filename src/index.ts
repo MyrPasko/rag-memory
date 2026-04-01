@@ -2,3 +2,5 @@
 export * from './schema/index.js';
 export * from './retrieval/index.js';
 export * from './mcp/server.js';
+export * from './session/save.js';
+export * from './evals/harness.js';
