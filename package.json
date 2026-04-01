@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
-    "test": "vitest run tests"
+    "test": "vitest run tests",
+    "eval:retrieval": "npm run build && node dist/cli/main.js eval-retrieval"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

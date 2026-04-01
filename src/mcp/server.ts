@@ -1,4 +1,5 @@
 import { z, ZodError, type ZodType } from 'zod';
+import { ArtifactScopeSchema, ArtifactStatusSchema } from '../schema/index.js';
 import { buildDerivedIndex } from '../retrieval/indexer.js';
 import {
   fetchArtifactSummary,
@@ -6,6 +7,7 @@ import {
   findRelatedSessions,
   getRepoConventions,
 } from '../retrieval/retrieve.js';
+import { saveSessionSummary, type SaveSessionSummaryInput } from '../session/save.js';
 import type {
   ArtifactSummary,
   DerivedIndex,
@@ -28,12 +30,19 @@ export const MCP_READ_TOOL_NAMES = [
   'find_related_sessions',
   'fetch_artifact_summary',
 ] as const;
+export const MCP_WRITE_TOOL_NAMES = ['save_session_summary'] as const;
+export const MCP_TOOL_NAMES = [
+  ...MCP_READ_TOOL_NAMES,
+  ...MCP_WRITE_TOOL_NAMES,
+] as const;
 
 export type McpReadToolName = (typeof MCP_READ_TOOL_NAMES)[number];
+export type McpWriteToolName = (typeof MCP_WRITE_TOOL_NAMES)[number];
+export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
 type TruncatedArtifactField = 'title' | 'summary' | 'tags' | 'sources';
 
 export interface McpReadToolDefinition {
-  name: McpReadToolName;
+  name: McpToolName;
   description: string;
   inputSchema: Record<string, unknown>;
 }
@@ -128,25 +137,34 @@ export interface FetchArtifactSummaryResult {
   truncated: boolean;
 }
 
+export interface SaveSessionSummaryResult {
+  tool: 'save_session_summary';
+  saved: true;
+  created: boolean;
+  artifact: McpArtifactSummary;
+  relative_path: string;
+}
+
 export type McpReadToolResult =
   | GetRepoConventionsResult
   | FindCanonicalPatternResult
   | FindRelatedSessionsResult
   | FetchArtifactSummaryResult;
+export type McpToolResult = McpReadToolResult | SaveSessionSummaryResult;
 
 export class McpToolValidationError extends Error {
   constructor(
-    public readonly toolName: McpReadToolName,
+    public readonly toolName: McpToolName,
     public readonly cause: ZodError,
   ) {
-    super(`Invalid arguments for MCP read tool "${toolName}"`);
+    super(`Invalid arguments for MCP tool "${toolName}"`);
     this.name = 'McpToolValidationError';
   }
 }
 
 export class McpToolNotFoundError extends Error {
   constructor(public readonly toolName: string) {
-    super(`Unknown MCP read tool "${toolName}"`);
+    super(`Unknown MCP tool "${toolName}"`);
     this.name = 'McpToolNotFoundError';
   }
 }
@@ -190,6 +208,33 @@ const fetchArtifactSummaryArgsSchema = z
     id: z.string().trim().min(1),
   })
   .strict();
+
+const saveSessionSummaryArgsSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    title: z.string().trim().min(1),
+    status: ArtifactStatusSchema,
+    scope: ArtifactScopeSchema,
+    repo: z.string().trim().min(1).optional(),
+    session_id: z.string().trim().min(1),
+    tags: z.array(z.string()).optional(),
+    summary: z.string().trim().min(1),
+    body: z.string().optional(),
+    created_at: z.string().trim().min(1),
+    updated_at: z.string().trim().min(1),
+    sources: z.array(z.string()).optional(),
+    supersedes: z.array(z.string()).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.scope === 'repo' && !value.repo) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'repo is required when scope is "repo"',
+        path: ['repo'],
+      });
+    }
+  });
 
 export const MCP_READ_TOOL_DEFINITIONS: readonly McpReadToolDefinition[] = [
   {
@@ -247,6 +292,49 @@ export const MCP_READ_TOOL_DEFINITIONS: readonly McpReadToolDefinition[] = [
         id: { type: 'string', minLength: 1 },
       },
       required: ['id'],
+    },
+  },
+] as const;
+
+export const MCP_WRITE_TOOL_DEFINITIONS: readonly McpReadToolDefinition[] = [
+  {
+    name: 'save_session_summary',
+    description:
+      'Persist one validated session summary into deterministic local session storage.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        title: { type: 'string', minLength: 1 },
+        status: {
+          type: 'string',
+          enum: ['draft', 'validated', 'canonical', 'deprecated'],
+        },
+        scope: {
+          type: 'string',
+          enum: ['global', 'repo', 'ticket', 'experiment'],
+        },
+        repo: { type: 'string' },
+        session_id: { type: 'string', minLength: 1 },
+        tags: { type: 'array', items: { type: 'string' } },
+        summary: { type: 'string', minLength: 1 },
+        body: { type: 'string' },
+        created_at: { type: 'string', minLength: 1 },
+        updated_at: { type: 'string', minLength: 1 },
+        sources: { type: 'array', items: { type: 'string' } },
+        supersedes: { type: 'array', items: { type: 'string' } },
+      },
+      required: [
+        'id',
+        'title',
+        'status',
+        'scope',
+        'session_id',
+        'summary',
+        'created_at',
+        'updated_at',
+      ],
     },
   },
 ] as const;
@@ -466,7 +554,7 @@ function toMcpMatch(
 }
 
 function parseArgs<T>(
-  toolName: McpReadToolName,
+  toolName: McpToolName,
   schema: ZodType<T>,
   args: unknown,
 ): T {
@@ -645,4 +733,63 @@ export function createMemoryReadMcpServer(
   options: McpReadServerOptions,
 ): MemoryReadMcpServer {
   return new MemoryReadMcpServer(options);
+}
+
+export class MemoryMcpServer {
+  private readonly readServer: MemoryReadMcpServer;
+  private readonly limits: NormalizedToolLimits;
+
+  constructor(private readonly options: McpReadServerOptions) {
+    this.readServer = new MemoryReadMcpServer(options);
+    this.limits = normalizeToolLimits(options);
+  }
+
+  listTools(): readonly McpReadToolDefinition[] {
+    return [...MCP_READ_TOOL_DEFINITIONS, ...MCP_WRITE_TOOL_DEFINITIONS];
+  }
+
+  async callTool(name: McpToolName, args: unknown): Promise<McpToolResult> {
+    if ((MCP_READ_TOOL_NAMES as readonly string[]).includes(name)) {
+      return this.readServer.callTool(name as McpReadToolName, args);
+    }
+
+    switch (name) {
+      case 'save_session_summary':
+        return this.handleSaveSessionSummary(args);
+      default:
+        throw new McpToolNotFoundError(name);
+    }
+  }
+
+  private async handleSaveSessionSummary(
+    args: unknown,
+  ): Promise<SaveSessionSummaryResult> {
+    if (!this.options.rootDir) {
+      throw new Error(
+        'save_session_summary requires "rootDir" because it writes to local storage.',
+      );
+    }
+
+    const parsed = parseArgs(
+      'save_session_summary',
+      saveSessionSummaryArgsSchema,
+      args,
+    ) as SaveSessionSummaryInput;
+    const saved = await saveSessionSummary(this.options.rootDir, parsed);
+    const formatted = toMcpArtifactSummary(saved.summary, this.limits);
+
+    return {
+      tool: 'save_session_summary',
+      saved: true,
+      created: saved.created,
+      artifact: formatted.artifact,
+      relative_path: saved.relativePath,
+    };
+  }
+}
+
+export function createMemoryMcpServer(
+  options: McpReadServerOptions,
+): MemoryMcpServer {
+  return new MemoryMcpServer(options);
 }
