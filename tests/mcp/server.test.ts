@@ -66,6 +66,38 @@ describe('MemoryReadMcpServer', () => {
     expect(result.results[0]?.provenance.length).toBeGreaterThan(0);
   });
 
+  it('marks repo convention results as truncated when extra matches are omitted at the requested limit', async () => {
+    const fixture = createTempMemoryRoot(
+      Array.from({ length: 6 }, (_, index) => ({
+        path: `knowledge/conventions/conv-limit-${index + 1}.md`,
+        frontmatter: {
+          id: `conv-limit-${index + 1}`,
+          type: 'convention',
+          title: `Limit convention ${index + 1}`,
+          status: 'canonical',
+          scope: 'repo',
+          repo: 'rag-memory',
+          tags: ['logging'],
+          summary: `Omitted-match contract check ${index + 1}.`,
+          created_at: '2026-03-31T08:00:00Z',
+          updated_at: `2026-03-31T1${index}:00:00Z`,
+        },
+        body: 'Use structured logging for deterministic observability.',
+      })),
+    );
+    cleanups.push(fixture.cleanup);
+
+    const server = createMemoryReadMcpServer({ rootDir: fixture.rootDir });
+    const result = await server.callTool('get_repo_conventions', {
+      repo: 'rag-memory',
+      text: 'logging',
+      limit: 5,
+    });
+
+    expect(result.result_count).toBe(5);
+    expect(result.truncated).toBe(true);
+  });
+
   it('keeps canonical pattern retrieval isolated from historical sessions', async () => {
     const fixture = createTempMemoryRoot([
       {
@@ -205,5 +237,15 @@ describe('MemoryReadMcpServer', () => {
     await expect(
       server.callTool('find_canonical_pattern', { repo: 'rag-memory' }),
     ).rejects.toBeInstanceOf(McpToolValidationError);
+  });
+
+  it('advertises the find_canonical_pattern id-or-text requirement in the tool schema', () => {
+    const definition = MCP_READ_TOOL_DEFINITIONS.find(
+      (tool) => tool.name === 'find_canonical_pattern',
+    );
+
+    expect(definition?.inputSchema).toMatchObject({
+      anyOf: [{ required: ['id'] }, { required: ['text'] }],
+    });
   });
 });

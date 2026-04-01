@@ -219,6 +219,7 @@ export const MCP_READ_TOOL_DEFINITIONS: readonly McpReadToolDefinition[] = [
         text: { type: 'string' },
         repo: { type: 'string' },
       },
+      anyOf: [{ required: ['id'] }, { required: ['text'] }],
     },
   },
   {
@@ -529,9 +530,12 @@ export class MemoryReadMcpServer {
     const matches = getRepoConventions(index, {
       repo: parsed.repo,
       text: normalizeOptionalString(parsed.text),
-      limit: limit.limit,
+      limit: limit.limit + 1,
     });
-    const formatted = matches.map((match) => toMcpMatch(match, this.limits));
+    const hasMoreMatches = matches.length > limit.limit;
+    const formatted = matches
+      .slice(0, limit.limit)
+      .map((match) => toMcpMatch(match, this.limits));
 
     return {
       tool: 'get_repo_conventions',
@@ -542,7 +546,8 @@ export class MemoryReadMcpServer {
       },
       results: formatted.map((entry) => entry.match),
       result_count: formatted.length,
-      truncated: limit.truncated || formatted.some((entry) => entry.truncated),
+      truncated:
+        limit.truncated || hasMoreMatches || formatted.some((entry) => entry.truncated),
     };
   }
 
@@ -586,9 +591,12 @@ export class MemoryReadMcpServer {
     const limit = clampLimit(parsed.limit, this.limits);
     const matches = findRelatedSessions(index, {
       text: parsed.text,
-      limit: limit.limit,
+      limit: limit.limit + 1,
     });
-    const formatted = matches.map((match) => toMcpMatch(match, this.limits));
+    const hasMoreMatches = matches.length > limit.limit;
+    const formatted = matches
+      .slice(0, limit.limit)
+      .map((match) => toMcpMatch(match, this.limits));
 
     return {
       tool: 'find_related_sessions',
@@ -598,7 +606,8 @@ export class MemoryReadMcpServer {
       },
       results: formatted.map((entry) => entry.match),
       result_count: formatted.length,
-      truncated: limit.truncated || formatted.some((entry) => entry.truncated),
+      truncated:
+        limit.truncated || hasMoreMatches || formatted.some((entry) => entry.truncated),
     };
   }
 
